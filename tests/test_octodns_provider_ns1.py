@@ -172,7 +172,7 @@ class TestNs1Provider(TestCase):
         'domain': 'unit.tests.',
     }]
 
-    @patch('ns1.NS1.loadZone')
+    @patch('nsone.NS1.loadZone')
     def test_populate(self, load_mock):
         provider = Ns1Provider('test', 'api-key')
 
@@ -291,8 +291,8 @@ class TestNs1Provider(TestCase):
         self.assertEquals(self.expected, zone.records)
         self.assertEquals(('unit.tests',), load_mock.call_args[0])
 
-    @patch('ns1.NS1.createZone')
-    @patch('ns1.NS1.loadZone')
+    @patch('nsone.NS1.createZone')
+    @patch('nsone.NS1.loadZone')
     def test_sync(self, load_mock, create_mock):
         provider = Ns1Provider('test', 'api-key')
 

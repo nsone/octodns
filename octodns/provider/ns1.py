@@ -10,7 +10,7 @@ from itertools import chain
 from collections import OrderedDict, defaultdict
 from ns1 import NS1
 from ns1.rest.errors import RateLimitException, ResourceException
-from pycountry_convert import country_alpha2_to_continent_code
+from incf.countryutils import transformations
 from time import sleep
 
 from six import text_type
