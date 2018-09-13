@@ -23,7 +23,7 @@ class Ns1Provider(BaseProvider):
     '''
     Ns1 provider
 
-    nsone:
+    ns1:
         class: octodns.provider.ns1.Ns1Provider
         api_key: env/NS1_API_KEY
     '''
@@ -215,12 +215,12 @@ class Ns1Provider(BaseProvider):
                        zone.name,
                        target, lenient)
 
-        nsone_zone = self.loadZone(zone.name)
-        if not nsone_zone:
+        ns1_zone = self.loadZone(zone.name)
+        if not ns1_zone:
             return False
 
         count = 0
-        for record in nsone_zone.data['records']:
+        for record in ns1_zone.data['records']:
             _type = record['type']
             if _type not in self.SUPPORTS:
                 continue
@@ -229,7 +229,7 @@ class Ns1Provider(BaseProvider):
                 for i, a in enumerate(record['short_answers']):
                     record['short_answers'][i] = self.ensure_fqdn(a)
             if record['tier'] != 1:
-                r = self.loadRecord(record['domain'], _type, nsone_zone.zone)
+                r = self.loadRecord(record['domain'], _type, ns1_zone.zone)
                 record = r.data
             data_for = getattr(self, '_data_for_{}'.format(_type))
             name = zone.hostname_from_fqdn(record['domain'])
@@ -316,24 +316,24 @@ class Ns1Provider(BaseProvider):
     def _get_name(self, record):
         return record.fqdn[:-1] if record.name == '' else record.name
 
-    def _apply_Create(self, nsone_zone, change):
+    def _apply_Create(self, ns1_zone, change):
         new = change.new
         name = self._get_name(new)
         _type = new._type
         params = getattr(self, '_params_for_{}'.format(_type))(new)
-        meth = getattr(nsone_zone, 'add_{}'.format(_type))
+        meth = getattr(ns1_zone, 'add_{}'.format(_type))
         try:
             meth(name, **params)
         except RateLimitException as e:
             self.log.warn('_apply_Create: rate limit exceeded, slowing down')
             sleep(e.period / 10)
-            self._apply_Create(nsone_zone, change)
+            self._apply_Create(ns1_zone, change)
 
-    def _apply_Update(self, nsone_zone, change):
+    def _apply_Update(self, ns1_zone, change):
         existing = change.existing
         name = self._get_name(existing)
         _type = existing._type
-        record = NS1Record(self.loadZone(nsone_zone.zone), name, _type)
+        record = NS1Record(self.loadZone(ns1_zone.zone), name, _type)
         record.data = True
         new = change.new
         params = getattr(self, '_params_for_{}'.format(_type))(new)
@@ -342,19 +342,19 @@ class Ns1Provider(BaseProvider):
         except RateLimitException as e:
             self.log.warn('_apply_Update: rate limit exceeded, slowing down')
             sleep(e.period / 10)
-            self._apply_Update(nsone_zone, change)
+            self._apply_Update(ns1_zone, change)
 
-    def _apply_Delete(self, nsone_zone, change):
+    def _apply_Delete(self, ns1_zone, change):
         existing = change.existing
         name = self._get_name(existing)
         _type = existing._type
-        record = self.loadRecord(name, _type, nsone_zone.zone)
+        record = self.loadRecord(name, _type, ns1_zone.zone)
         try:
             record.delete()
         except RateLimitException as e:
             self.log.warn('_apply_Delete: rate limit exceeded, slowing down')
             sleep(e.period / 10)
-            self._apply_Delete(nsone_zone, change)
+            self._apply_Delete(ns1_zone, change)
 
     def _apply(self, plan):
         desired = plan.desired
@@ -363,9 +363,9 @@ class Ns1Provider(BaseProvider):
                        len(changes))
 
         domain_name = desired.name[:-1]
-        nsone_zone = self.loadZone(domain_name, True)
+        ns1_zone = self.loadZone(domain_name, True)
 
         for change in changes:
             class_name = change.__class__.__name__
-            getattr(self, '_apply_{}'.format(class_name))(nsone_zone,
+            getattr(self, '_apply_{}'.format(class_name))(ns1_zone,
                                                           change)
