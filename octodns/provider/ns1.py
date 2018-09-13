@@ -62,7 +62,7 @@ class Ns1Provider(BaseProvider):
         return self._record_cache.get(rec)
 
     def _data_for_A(self, _type, record):
-        # record meta (which would include geo information is only
+        # record meta (which would include geo information) is only
         # returned when getting a record's detail, not from zone detail
         geo = defaultdict(list)
         data = {
