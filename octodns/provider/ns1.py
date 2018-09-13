@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
 from logging import getLogger
-from itertools import chain
 from collections import OrderedDict, defaultdict
 from ns1 import NS1
 from ns1.rest.errors import RateLimitException, ResourceException
@@ -213,44 +212,31 @@ class Ns1Provider(BaseProvider):
                        zone.name,
                        target, lenient)
 
-        try:
-            nsone_zone = self._client.loadZone(zone.name[:-1])
-            records = nsone_zone.data['records']
+        nsone_zone = self.loadZone(zone.name)
+        if not nsone_zone:
+            return False
 
-            # change answers for certain types to always be absolute
-            for record in records:
-                if record['type'] in ['ALIAS', 'CNAME', 'MX', 'NS', 'PTR',
-                                      'SRV']:
-                    for i, a in enumerate(record['short_answers']):
-                        if not a.endswith('.'):
-                            record['short_answers'][i] = '{}.'.format(a)
-
-            geo_records = nsone_zone.search(has_geo=True)
-            exists = True
-        except ResourceException as e:
-            if e.message != self.ZONE_NOT_FOUND_MESSAGE:
-                raise
-            records = []
-            geo_records = []
-            exists = False
-
-        before = len(zone.records)
-        # geo information isn't returned from the main endpoint, so we need
-        # to query for all records with geo information
-        zone_hash = {}
-        for record in chain(records, geo_records):
+        count = 0
+        for record in nsone_zone.data['records']:
             _type = record['type']
             if _type not in self.SUPPORTS:
                 continue
+            count += 1
+            if _type in ['ALIAS', 'CNAME', 'MX', 'NS', 'PTR', 'SRV']:
+                for i, a in enumerate(record['short_answers']):
+                    record['short_answers'][i] = self.ensure_fqdn(a)
+            if record['tier'] != 1:
+                r = self.loadRecord(record['domain'], _type, nsone_zone.zone)
+                record = r.data
             data_for = getattr(self, '_data_for_{}'.format(_type))
             name = zone.hostname_from_fqdn(record['domain'])
             record = Record.new(zone, name, data_for(_type, record),
                                 source=self, lenient=lenient)
-            zone_hash[(_type, name)] = record
-        [zone.add_record(r, lenient=lenient) for r in zone_hash.values()]
-        self.log.info('populate:   found %s records, exists=%s',
-                      len(zone.records) - before, exists)
-        return exists
+            zone.add_record(record, lenient=lenient)
+
+        self.log.info('populate:   found %s records, exists=True', count)
+
+        return True
 
     def _params_for_A(self, record):
         params = {'answers': record.values, 'ttl': record.ttl}
