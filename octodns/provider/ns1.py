@@ -205,6 +205,9 @@ class Ns1Provider(BaseProvider):
             'values': values,
         }
 
+    def ensure_fqdn(self, name):
+        return "%s." % name.rstrip('.')
+
     def populate(self, zone, target=False, lenient=False):
         self.log.debug('populate: name=%s, target=%s, lenient=%s',
                        zone.name,
