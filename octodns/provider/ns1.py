@@ -8,7 +8,6 @@ from __future__ import absolute_import, division, print_function, \
 from logging import getLogger
 from collections import OrderedDict, defaultdict
 from ns1 import NS1
-from ns1.records import Record as NS1Record
 from ns1.rest.errors import RateLimitException, ResourceException
 from incf.countryutils import transformations
 from time import sleep
@@ -36,6 +35,8 @@ class Ns1Provider(BaseProvider):
         self.log.debug('__init__: id=%s, api_key=***', id)
         super(Ns1Provider, self).__init__(id, *args, **kwargs)
         self._NS1 = NS1(apiKey=api_key)
+        self._NS1Records = self._NS1.records()
+        self._NS1Zones = self._NS1.zones()
         self._zone_cache = {}
         self._record_cache = {}
 
@@ -311,59 +312,49 @@ class Ns1Provider(BaseProvider):
                   for v in record.values]
         return {'answers': values, 'ttl': record.ttl}
 
-    def _get_name(self, record):
-        return record.fqdn[:-1] if record.name == '' else record.name
+    def _params_for(self, record):
+        params_for_type = getattr(self, '_params_for_%s' % record._type)
+        return params_for_type(record)
 
-    def _apply_Create(self, ns1_zone, change):
-        new = change.new
-        name = self._get_name(new)
-        _type = new._type
-        params = getattr(self, '_params_for_{}'.format(_type))(new)
-        meth = getattr(ns1_zone, 'add_{}'.format(_type))
+    def _apply_Create(self, change):
+        rec = change.new
+        zone = rec.zone.name.rstrip('.')
+        domain = rec.fqdn.rstrip('.')
+        params = self._params_for(rec)
         try:
-            meth(name, **params)
+            self._NS1Records.create(zone, domain, rec._type, **params)
         except RateLimitException as e:
             self.log.warn('_apply_Create: rate limit exceeded, slowing down')
             sleep(e.period / 10)
-            self._apply_Create(ns1_zone, change)
+            self._apply_Create(change)
 
-    def _apply_Update(self, ns1_zone, change):
-        existing = change.existing
-        name = self._get_name(existing)
-        _type = existing._type
-        record = NS1Record(self.loadZone(ns1_zone.zone), name, _type)
-        record.data = True
-        new = change.new
-        params = getattr(self, '_params_for_{}'.format(_type))(new)
+    def _apply_Update(self, change):
+        rec = change.new
+        zone = rec.zone.name.rstrip('.')
+        domain = rec.fqdn.rstrip('.')
+        params = self._params_for(rec)
         try:
-            record.update(**params)
+            self._NS1Records.update(zone, domain, rec._type, **params)
         except RateLimitException as e:
             self.log.warn('_apply_Update: rate limit exceeded, slowing down')
             sleep(e.period / 10)
-            self._apply_Update(ns1_zone, change)
+            self._apply_Update(change)
 
-    def _apply_Delete(self, ns1_zone, change):
-        existing = change.existing
-        name = self._get_name(existing)
-        _type = existing._type
-        record = self.loadRecord(name, _type, ns1_zone.zone)
+    def _apply_Delete(self, change):
+        rec = change.existing
+        zone = rec.zone.name.rstrip('.')
+        domain = rec.fqdn.rstrip('.')
         try:
-            record.delete()
+            self._NS1Records.delete(zone, domain, rec._type)
         except RateLimitException as e:
             self.log.warn('_apply_Delete: rate limit exceeded, slowing down')
             sleep(e.period / 10)
-            self._apply_Delete(ns1_zone, change)
+            self._apply_Delete(change)
 
     def _apply(self, plan):
-        desired = plan.desired
-        changes = plan.changes
-        self.log.debug('_apply: zone=%s, len(changes)=%d', desired.name,
-                       len(changes))
-
-        domain_name = desired.name[:-1]
-        ns1_zone = self.loadZone(domain_name, True)
-
-        for change in changes:
+        self.log.debug('_apply: zone=%s, len(changes)=%d', plan.desired.name,
+                       len(plan.changes))
+        self.loadZone(plan.desired.name, create=True)
+        for change in plan.changes:
             class_name = change.__class__.__name__
-            getattr(self, '_apply_{}'.format(class_name))(ns1_zone,
-                                                          change)
+            getattr(self, '_apply_{}'.format(class_name))(change)
