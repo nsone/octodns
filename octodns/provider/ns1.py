@@ -49,7 +49,7 @@ class Ns1Provider(BaseProvider):
                     raise
                 if create:
                     self.log.debug('loadZone: creating zone %s', zone)
-                    self._zone_cache[zone] = self._client.createZone(zone)
+                    self._zone_cache[zone] = self._NS1.createZone(zone)
         return self._zone_cache.get(zone)
 
     def loadRecord(self, domain, _type, zone):
