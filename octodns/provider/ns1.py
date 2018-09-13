@@ -8,6 +8,7 @@ from __future__ import absolute_import, division, print_function, \
 from logging import getLogger
 from collections import OrderedDict, defaultdict
 from ns1 import NS1
+from ns1.records import Record as NS1Record
 from ns1.rest.errors import RateLimitException, ResourceException
 from incf.countryutils import transformations
 from time import sleep
@@ -332,7 +333,8 @@ class Ns1Provider(BaseProvider):
         existing = change.existing
         name = self._get_name(existing)
         _type = existing._type
-        record = self.loadRecord(name, _type, nsone_zone.zone)
+        record = NS1Record(self.loadZone(nsone_zone.zone), name, _type)
+        record.data = True
         new = change.new
         params = getattr(self, '_params_for_{}'.format(_type))(new)
         try:
