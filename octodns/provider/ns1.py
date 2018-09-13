@@ -30,12 +30,36 @@ class Ns1Provider(BaseProvider):
                     'NS', 'PTR', 'SPF', 'SRV', 'TXT'))
 
     ZONE_NOT_FOUND_MESSAGE = 'server error: zone not found'
+    _zone_cache = {}
+    _record_cache = {}
 
     def __init__(self, id, api_key, *args, **kwargs):
         self.log = getLogger('Ns1Provider[{}]'.format(id))
         self.log.debug('__init__: id=%s, api_key=***', id)
         super(Ns1Provider, self).__init__(id, *args, **kwargs)
         self._client = NS1(apiKey=api_key)
+
+    def loadZone(self, zone, create=False):
+        zone = zone.rstrip('.')
+        if zone not in self._zone_cache:
+            try:
+                self._zone_cache[zone] = self._client.loadZone(zone)
+            except ResourceException as e:
+                if e.message != self.ZONE_NOT_FOUND_MESSAGE:
+                    raise
+                if create:
+                    self.log.debug('loadZone: creating zone %s', zone)
+                    self._zone_cache[zone] = self._client.createZone(zone)
+        return self._zone_cache.get(zone)
+
+    def loadRecord(self, domain, _type, zone):
+        domain = domain.rstrip('.')
+        zone = zone.rstrip('.')
+        self.log.debug('loadRecord(%s, %s, %s)', domain, _type, zone)
+        rec = (domain, _type, zone)
+        if rec not in self._record_cache:
+            self._record_cache[rec] = self._client.loadRecord(*rec)
+        return self._record_cache.get(rec)
 
     def _data_for_A(self, _type, record):
         # record meta (which would include geo information is only
