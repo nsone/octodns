@@ -38,7 +38,7 @@ class Ns1Provider(BaseProvider):
         self.log = getLogger('Ns1Provider[{}]'.format(id))
         self.log.debug('__init__: id=%s, api_key=***', id)
         super(Ns1Provider, self).__init__(id, *args, **kwargs)
-        self._client = NS1(apiKey=api_key)
+        self._NS1 = NS1(apiKey=api_key)
         self._zone_cache = {}
         self._record_cache = {}
 
@@ -46,7 +46,7 @@ class Ns1Provider(BaseProvider):
         zone = zone.rstrip('.')
         if zone not in self._zone_cache:
             try:
-                self._zone_cache[zone] = self._client.loadZone(zone)
+                self._zone_cache[zone] = self._NS1.loadZone(zone)
             except ResourceException as e:
                 if e.message != self.ZONE_NOT_FOUND_MESSAGE:
                     raise
@@ -61,7 +61,7 @@ class Ns1Provider(BaseProvider):
         self.log.debug('loadRecord(%s, %s, %s)', domain, _type, zone)
         rec = (domain, _type, zone)
         if rec not in self._record_cache:
-            self._record_cache[rec] = self._client.loadRecord(*rec)
+            self._record_cache[rec] = self._NS1.loadRecord(*rec)
         return self._record_cache.get(rec)
 
     def _data_for_A(self, _type, record):
