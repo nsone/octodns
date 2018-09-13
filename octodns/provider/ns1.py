@@ -343,7 +343,7 @@ class Ns1Provider(BaseProvider):
         existing = change.existing
         name = self._get_name(existing)
         _type = existing._type
-        record = nsone_zone.loadRecord(name, _type)
+        record = self.loadRecord(name, _type, nsone_zone.zone)
         new = change.new
         params = getattr(self, '_params_for_{}'.format(_type))(new)
         try:
@@ -359,7 +359,7 @@ class Ns1Provider(BaseProvider):
         existing = change.existing
         name = self._get_name(existing)
         _type = existing._type
-        record = nsone_zone.loadRecord(name, _type)
+        record = self.loadRecord(name, _type, nsone_zone.zone)
         try:
             record.delete()
         except RateLimitException as e:
@@ -376,13 +376,7 @@ class Ns1Provider(BaseProvider):
                        len(changes))
 
         domain_name = desired.name[:-1]
-        try:
-            nsone_zone = self._client.loadZone(domain_name)
-        except ResourceException as e:
-            if e.message != self.ZONE_NOT_FOUND_MESSAGE:
-                raise
-            self.log.debug('_apply:   no matching zone, creating')
-            nsone_zone = self._client.createZone(domain_name)
+        nsone_zone = self.loadZone(domain_name, True)
 
         for change in changes:
             class_name = change.__class__.__name__
