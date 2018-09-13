@@ -30,14 +30,14 @@ class Ns1Provider(BaseProvider):
                     'NS', 'PTR', 'SPF', 'SRV', 'TXT'))
 
     ZONE_NOT_FOUND_MESSAGE = 'server error: zone not found'
-    _zone_cache = {}
-    _record_cache = {}
 
     def __init__(self, id, api_key, *args, **kwargs):
         self.log = getLogger('Ns1Provider[{}]'.format(id))
         self.log.debug('__init__: id=%s, api_key=***', id)
         super(Ns1Provider, self).__init__(id, *args, **kwargs)
         self._client = NS1(apiKey=api_key)
+        self._zone_cache = {}
+        self._record_cache = {}
 
     def loadZone(self, zone, create=False):
         zone = zone.rstrip('.')
