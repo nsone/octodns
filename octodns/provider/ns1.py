@@ -27,8 +27,12 @@ class Ns1Provider(BaseProvider):
     SUPPORTS_GEO = True
     SUPPORTS = set(('A', 'AAAA', 'ALIAS', 'CAA', 'CNAME', 'MX', 'NAPTR',
                     'NS', 'PTR', 'SPF', 'SRV', 'TXT'))
-
     ZONE_NOT_FOUND_MESSAGE = 'server error: zone not found'
+    GEO_FILTER_CHAIN = [
+        {"filter": "shuffle", "config": {}},
+        {"filter": "geotarget_country", "config": {}},
+        {"filter": "select_first_n", "config": {"N": 1}}
+    ]
 
     def __init__(self, id, api_key, *args, **kwargs):
         self.log = getLogger('Ns1Provider[{}]'.format(id))
@@ -249,30 +253,14 @@ class Ns1Provider(BaseProvider):
                                  for x in record.values]
             has_country = False
             for iso_region, target in record.geo.items():
-                key = 'iso_region_code'
-                value = iso_region
-                if not has_country and \
-                   len(value.split('-')) > 1:  # pragma: nocover
+                if len(iso_region.split('-')) > 1:
                     has_country = True
                 for answer in target.values:
-                    params['answers'].append(
-                        {
-                            'answer': [answer],
-                            'meta': {key: [value]},
-                        },
-                    )
-            params['filters'] = []
-            if has_country:
-                params['filters'].append(
-                    {"filter": "shuffle", "config": {}}
-                )
-                params['filters'].append(
-                    {"filter": "geotarget_country", "config": {}}
-                )
-                params['filters'].append(
-                    {"filter": "select_first_n",
-                     "config": {"N": 1}}
-                )
+                    params['answers'].append({
+                        'answer': [answer],
+                        'meta': {'iso_region_code': [iso_region]},
+                    })
+            params['filters'] = self.GEO_FILTER_CHAIN if has_country else []
         self.log.debug("params for A: %s", params)
         return params
 
