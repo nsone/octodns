@@ -9,7 +9,7 @@ from logging import getLogger
 from collections import OrderedDict, defaultdict
 from ns1 import NS1
 from ns1.rest.errors import RateLimitException, ResourceException
-from incf.countryutils import transformations
+from incf.countryutils.transformations import cc_to_cn, cn_to_ctca2
 from time import sleep
 
 from six import text_type
@@ -70,48 +70,43 @@ class Ns1Provider(BaseProvider):
         return self._record_cache.get(rec)
 
     def _data_for_A(self, _type, record):
-        # record meta (which would include geo information) is only
-        # returned when getting a record's detail, not from zone detail
+        data = {'ttl': record['ttl'], 'type': _type, 'values': []}
+
+        # If it's not a geo-enabled record, we'll only have the short version
+        # returned by the /v1/zones/<zone> endpoint, which has no metadata.
+        if not record.get('answers'):
+            data['values'] = [str(a) for a in record.get('short_answers', [])]
+            return data
+
+        # For geo-enabled records we will have the full record object.
         geo = defaultdict(list)
-        data = {
-            'ttl': record['ttl'],
-            'type': _type,
-        }
-        values, codes = [], []
-        if 'answers' not in record:
-            values = record['short_answers']
         for answer in record.get('answers', []):
             meta = answer.get('meta', {})
-            if meta:
-                # country + state and country + province are allowed
-                # in that case though, supplying a state/province would
-                # be redundant since the country would supercede in when
-                # resolving the record.  it is syntactically valid, however.
-                country = meta.get('country', [])
-                us_state = meta.get('us_state', [])
-                ca_province = meta.get('ca_province', [])
-                for cntry in country:
-                    con = country_alpha2_to_continent_code(cntry)
-                    key = '{}-{}'.format(con, cntry)
-                    geo[key].extend(answer['answer'])
-                for state in us_state:
-                    key = 'NA-US-{}'.format(state)
-                    geo[key].extend(answer['answer'])
-                for province in ca_province:
-                    key = 'NA-CA-{}'.format(province)
-                    geo[key].extend(answer['answer'])
-                for code in meta.get('iso_region_code', []):
-                    key = code
-                    geo[key].extend(answer['answer'])
+            countries = meta.get('country')
+            us_states = meta.get('us_state')
+            ca_provinces = meta.get('ca_province')
+
+            # Because us_state and ca_province metadata both imply a country,
+            # only check for country if neither of those are specified.
+            if us_states:
+                for state in us_states:
+                    key = str('NA-US-%s' % state)
+                    geo[key].extend([str(a) for a in answer['answer']])
+            elif ca_provinces:
+                for province in ca_provinces:
+                    key = str('NA-CA-%s' % province)
+                    geo[key].extend([str(a) for a in answer['answer']])
+            elif countries:
+                for country in countries:
+                    continent = cn_to_ctca2(cc_to_cn(country))
+                    key = '{}-{}'.format(continent, country)
+                    geo[key].extend([str(a) for a in answer['answer']])
             else:
-                values.extend(answer['answer'])
-                codes.append([])
-        values = [text_type(x) for x in values]
-        geo = OrderedDict(
-            {text_type(k): [text_type(x) for x in v] for k, v in geo.items()}
-        )
-        data['values'] = values
-        data['geo'] = geo
+                # No geo metadata means this is the regionless default answer
+                # that octo requires be present on all geo records.
+                data['values'].extend([str(a) for a in answer['answer']])
+
+        data['geo'] = OrderedDict(geo)
         return data
 
     _data_for_AAAA = _data_for_A
