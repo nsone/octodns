@@ -213,8 +213,7 @@ class Ns1Provider(BaseProvider):
 
     def populate(self, zone, target=False, lenient=False):
         self.log.debug('populate: name=%s, target=%s, lenient=%s',
-                       zone.name,
-                       target, lenient)
+                       zone.name, target, lenient)
 
         ns1_zone = self.loadZone(zone.name)
         if not ns1_zone:
@@ -238,7 +237,6 @@ class Ns1Provider(BaseProvider):
             zone.add_record(record, lenient=lenient)
 
         self.log.info('populate:   found %s records, exists=True', count)
-
         return True
 
     def _params_for_A(self, record):
