@@ -306,40 +306,34 @@ class Ns1Provider(BaseProvider):
         zone = rec.zone.name.rstrip('.')
         domain = rec.fqdn.rstrip('.')
         params = self._params_for(rec)
-        try:
-            self._NS1Records.create(zone, domain, rec._type, **params)
-        except RateLimitException as e:
-            self.log.warn('_apply_Create: rate limit exceeded, slowing down')
-            sleep(int(e.period) / 10)
-            self._apply_Create(change)
+        self._NS1Records.create(zone, domain, rec._type, **params)
 
     def _apply_Update(self, change):
         rec = change.new
         zone = rec.zone.name.rstrip('.')
         domain = rec.fqdn.rstrip('.')
         params = self._params_for(rec)
-        try:
-            self._NS1Records.update(zone, domain, rec._type, **params)
-        except RateLimitException as e:
-            self.log.warn('_apply_Update: rate limit exceeded, slowing down')
-            sleep(int(e.period) / 10)
-            self._apply_Update(change)
+        self._NS1Records.update(zone, domain, rec._type, **params)
 
     def _apply_Delete(self, change):
         rec = change.existing
         zone = rec.zone.name.rstrip('.')
         domain = rec.fqdn.rstrip('.')
-        try:
-            self._NS1Records.delete(zone, domain, rec._type)
-        except RateLimitException as e:
-            self.log.warn('_apply_Delete: rate limit exceeded, slowing down')
-            sleep(int(e.period) / 10)
-            self._apply_Delete(change)
+        self._NS1Records.delete(zone, domain, rec._type)
 
     def _apply(self, plan):
         self.log.debug('_apply: zone=%s, len(changes)=%d', plan.desired.name,
                        len(plan.changes))
         self.loadZone(plan.desired.name, create=True)
+
         for change in plan.changes:
-            class_name = change.__class__.__name__
-            getattr(self, '_apply_{}'.format(class_name))(change)
+            change_type = change.__class__.__name__
+            make = getattr(self, '_apply_%s' % change_type)
+            while True:
+                try:
+                    make(change)
+                    break
+                except RateLimitException as e:
+                    self.log.warn('_apply_%s: rate limit exceeded, throttling',
+                                  change_type)
+                    sleep(int(e.period) / 10)
