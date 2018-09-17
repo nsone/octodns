@@ -307,7 +307,7 @@ class Ns1Provider(BaseProvider):
             self._NS1Records.create(zone, domain, rec._type, **params)
         except RateLimitException as e:
             self.log.warn('_apply_Create: rate limit exceeded, slowing down')
-            sleep(e.period / 10)
+            sleep(int(e.period) / 10)
             self._apply_Create(change)
 
     def _apply_Update(self, change):
@@ -319,7 +319,7 @@ class Ns1Provider(BaseProvider):
             self._NS1Records.update(zone, domain, rec._type, **params)
         except RateLimitException as e:
             self.log.warn('_apply_Update: rate limit exceeded, slowing down')
-            sleep(e.period / 10)
+            sleep(int(e.period) / 10)
             self._apply_Update(change)
 
     def _apply_Delete(self, change):
@@ -330,7 +330,7 @@ class Ns1Provider(BaseProvider):
             self._NS1Records.delete(zone, domain, rec._type)
         except RateLimitException as e:
             self.log.warn('_apply_Delete: rate limit exceeded, slowing down')
-            sleep(e.period / 10)
+            sleep(int(e.period) / 10)
             self._apply_Delete(change)
 
     def _apply(self, plan):
