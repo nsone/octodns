@@ -188,7 +188,7 @@ class Ns1Provider(BaseProvider):
         return {
             'ttl': record['ttl'],
             'type': _type,
-            'values': [self.ensure_fqdn(a) for a in record['answers']],
+            'values': [self._ensure_fqdn(a) for a in record['answers']],
         }
 
     def _data_for_SRV(self, _type, record):
@@ -211,7 +211,7 @@ class Ns1Provider(BaseProvider):
         data_for_type = getattr(self, '_data_for_%s' % _type)
         return data_for_type(_type, record)
 
-    def ensure_fqdn(self, name):
+    def _ensure_fqdn(self, name):
         return "%s." % name.rstrip('.')
 
     def populate(self, zone, target=False, lenient=False):
@@ -233,7 +233,7 @@ class Ns1Provider(BaseProvider):
                 record = self.loadRecord(record['domain'], _type, zone.name)
             if _type in ['ALIAS', 'CNAME', 'MX', 'NS', 'PTR', 'SRV']:
                 for i, a in enumerate(record['answers']):
-                    record['answers'][i] = self.ensure_fqdn(a)
+                    record['answers'][i] = self._ensure_fqdn(a)
             name = zone.hostname_from_fqdn(record['domain'])
             record = Record.new(zone, name, self._data_for(_type, record),
                                 source=self, lenient=lenient)
