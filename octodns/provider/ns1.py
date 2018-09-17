@@ -206,6 +206,10 @@ class Ns1Provider(BaseProvider):
             'values': values,
         }
 
+    def _data_for(self, _type, record):
+        data_for_type = getattr(self, '_data_for_%s' % _type)
+        return data_for_type(_type, record)
+
     def ensure_fqdn(self, name):
         return "%s." % name.rstrip('.')
 
@@ -228,9 +232,8 @@ class Ns1Provider(BaseProvider):
                     record['short_answers'][i] = self.ensure_fqdn(a)
             if record['tier'] != 1:
                 record = self.loadRecord(record['domain'], _type, zone.name)
-            data_for = getattr(self, '_data_for_{}'.format(_type))
             name = zone.hostname_from_fqdn(record['domain'])
-            record = Record.new(zone, name, data_for(_type, record),
+            record = Record.new(zone, name, self._data_for(_type, record),
                                 source=self, lenient=lenient)
             zone.add_record(record, lenient=lenient)
 
