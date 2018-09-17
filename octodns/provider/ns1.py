@@ -188,8 +188,7 @@ class Ns1Provider(BaseProvider):
         return {
             'ttl': record['ttl'],
             'type': _type,
-            'values': [a if a.endswith('.') else '{}.'.format(a)
-                       for a in record['answers']],
+            'values': [self.ensure_fqdn(a) for a in record['answers']],
         }
 
     def _data_for_SRV(self, _type, record):
