@@ -75,9 +75,8 @@ class Ns1Provider(BaseProvider):
 
         # If it's not a geo-enabled record, we'll only have the short version
         # returned by the /v1/zones/<zone> endpoint, which has no metadata.
-        if not record.get('answers'):
-            data['values'] = [unicode(a)
-                              for a in record.get('short_answers', [])]
+        if not record.get('filters'):
+            data['values'] = [unicode(a) for a in record.get('answers', [])]
             return data
 
         # For geo-enabled records we will have the full record object.
@@ -114,7 +113,7 @@ class Ns1Provider(BaseProvider):
     _data_for_AAAA = _data_for_A
 
     def _data_for_SPF(self, _type, record):
-        values = [v.replace(';', '\\;') for v in record['short_answers']]
+        values = [v.replace(';', '\\;') for v in record['answers']]
         return {
             'ttl': record['ttl'],
             'type': _type,
@@ -125,7 +124,7 @@ class Ns1Provider(BaseProvider):
 
     def _data_for_CAA(self, _type, record):
         values = []
-        for answer in record['short_answers']:
+        for answer in record['answers']:
             flags, tag, value = answer.split(' ', 2)
             values.append({
                 'flags': flags,
@@ -140,7 +139,7 @@ class Ns1Provider(BaseProvider):
 
     def _data_for_CNAME(self, _type, record):
         try:
-            value = record['short_answers'][0]
+            value = record['answers'][0]
         except IndexError:
             value = None
         return {
@@ -154,7 +153,7 @@ class Ns1Provider(BaseProvider):
 
     def _data_for_MX(self, _type, record):
         values = []
-        for answer in record['short_answers']:
+        for answer in record['answers']:
             preference, exchange = answer.split(' ', 1)
             values.append({
                 'preference': preference,
@@ -168,7 +167,7 @@ class Ns1Provider(BaseProvider):
 
     def _data_for_NAPTR(self, _type, record):
         values = []
-        for answer in record['short_answers']:
+        for answer in record['answers']:
             order, preference, flags, service, regexp, replacement = \
                 answer.split(' ', 5)
             values.append({
@@ -190,12 +189,12 @@ class Ns1Provider(BaseProvider):
             'ttl': record['ttl'],
             'type': _type,
             'values': [a if a.endswith('.') else '{}.'.format(a)
-                       for a in record['short_answers']],
+                       for a in record['answers']],
         }
 
     def _data_for_SRV(self, _type, record):
         values = []
-        for answer in record['short_answers']:
+        for answer in record['answers']:
             priority, weight, port, target = answer.split(' ', 3)
             values.append({
                 'priority': priority,
@@ -230,11 +229,12 @@ class Ns1Provider(BaseProvider):
             if _type not in self.SUPPORTS:
                 continue
             count += 1
-            if _type in ['ALIAS', 'CNAME', 'MX', 'NS', 'PTR', 'SRV']:
-                for i, a in enumerate(record['short_answers']):
-                    record['short_answers'][i] = self.ensure_fqdn(a)
+            record['answers'] = record['short_answers']
             if record['tier'] != 1:
                 record = self.loadRecord(record['domain'], _type, zone.name)
+            if _type in ['ALIAS', 'CNAME', 'MX', 'NS', 'PTR', 'SRV']:
+                for i, a in enumerate(record['answers']):
+                    record['answers'][i] = self.ensure_fqdn(a)
             name = zone.hostname_from_fqdn(record['domain'])
             record = Record.new(zone, name, self._data_for(_type, record),
                                 source=self, lenient=lenient)
