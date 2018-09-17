@@ -218,7 +218,7 @@ class Ns1Provider(BaseProvider):
             return False
 
         count = 0
-        for record in ns1_zone['records']:
+        for record in ns1_zone.get('records', []):
             _type = record['type']
             if _type not in self.SUPPORTS:
                 continue
