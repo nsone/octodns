@@ -242,23 +242,28 @@ class Ns1Provider(BaseProvider):
         return True
 
     def _params_for_A(self, record):
-        params = {'answers': record.values, 'ttl': record.ttl}
-        if hasattr(record, 'geo'):
-            # purposefully set non-geo answers to have an empty meta,
-            # so that we know we did this on purpose if/when troubleshooting
-            params['answers'] = [{"answer": [x], "meta": {}}
-                                 for x in record.values]
-            has_country = False
-            for iso_region, target in record.geo.items():
-                if len(iso_region.split('-')) > 1:
-                    has_country = True
-                for answer in target.values:
-                    params['answers'].append({
-                        'answer': [answer],
-                        'meta': {'iso_region_code': [iso_region]},
-                    })
-            params['filters'] = self.GEO_FILTER_CHAIN if has_country else []
-        self.log.debug("params for A: %s", params)
+        params = {
+            'answers': [{'answer': [x]} for x in record.values],
+            'ttl': record.ttl
+        }
+        geo = False
+
+        for iso_region_code, target in getattr(record, 'geo', {}).items():
+            parts = iso_region_code.split('-')
+            country = parts[1] if len(parts) > 1 else None
+            state = parts[2] if len(parts) > 2 else None
+            if country:
+                geo = True
+                if state and country == 'US':
+                    meta = {'us_state': state}
+                elif state and country == 'CA':
+                    meta = {'ca_province': state}
+                else:
+                    meta = {'country': country}
+                for ans in target.values:
+                    params['answers'].append({'answer': [ans], 'meta': meta})
+
+        params['filters'] = self.GEO_FILTER_CHAIN if geo else []
         return params
 
     _params_for_AAAA = _params_for_A
