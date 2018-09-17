@@ -38,7 +38,7 @@ class Ns1Provider(BaseProvider):
     ]
 
     def __init__(self, id, api_key, *args, **kwargs):
-        self.log = getLogger('Ns1Provider[{}]'.format(id))
+        self.log = getLogger('Ns1Provider[%s]' % id)
         self.log.debug('__init__: id=%s, api_key=***', id)
         super(Ns1Provider, self).__init__(id, *args, **kwargs)
         _NS1 = NS1(apiKey=api_key)
