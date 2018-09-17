@@ -38,32 +38,33 @@ class Ns1Provider(BaseProvider):
         self.log = getLogger('Ns1Provider[{}]'.format(id))
         self.log.debug('__init__: id=%s, api_key=***', id)
         super(Ns1Provider, self).__init__(id, *args, **kwargs)
-        self._NS1 = NS1(apiKey=api_key)
-        self._NS1Records = self._NS1.records()
-        self._NS1Zones = self._NS1.zones()
+        _NS1 = NS1(apiKey=api_key)
+        self._NS1Records = _NS1.records()
+        self._NS1Zones = _NS1.zones()
         self._zone_cache = {}
         self._record_cache = {}
 
     def loadZone(self, zone, create=False):
         zone = zone.rstrip('.')
         if zone not in self._zone_cache:
-            try:
-                self._zone_cache[zone] = self._NS1.loadZone(zone)
-            except ResourceException as e:
-                if e.message != self.ZONE_NOT_FOUND_MESSAGE:
-                    raise
-                if create:
-                    self.log.debug('loadZone: creating zone %s', zone)
-                    self._zone_cache[zone] = self._NS1.createZone(zone)
+            if create:
+                self.log.debug('loadZone: creating zone %s', zone)
+                self._zone_cache[zone] = self._NS1Zones.create(zone)
+            else:
+                try:
+                    self._zone_cache[zone] = self._NS1Zones.retrieve(zone)
+                except ResourceException as e:
+                    if e.message != self.ZONE_NOT_FOUND_MESSAGE:
+                        raise
         return self._zone_cache.get(zone)
 
     def loadRecord(self, domain, _type, zone):
         domain = domain.rstrip('.')
         zone = zone.rstrip('.')
         self.log.debug('loadRecord(%s, %s, %s)', domain, _type, zone)
-        rec = (domain, _type, zone)
+        rec = (zone, domain, _type)
         if rec not in self._record_cache:
-            self._record_cache[rec] = self._NS1.loadRecord(*rec)
+            self._record_cache[rec] = self._NS1Records.retrieve(*rec)
         return self._record_cache.get(rec)
 
     def _data_for_A(self, _type, record):
@@ -217,7 +218,7 @@ class Ns1Provider(BaseProvider):
             return False
 
         count = 0
-        for record in ns1_zone.data['records']:
+        for record in ns1_zone['records']:
             _type = record['type']
             if _type not in self.SUPPORTS:
                 continue
@@ -226,8 +227,7 @@ class Ns1Provider(BaseProvider):
                 for i, a in enumerate(record['short_answers']):
                     record['short_answers'][i] = self.ensure_fqdn(a)
             if record['tier'] != 1:
-                r = self.loadRecord(record['domain'], _type, ns1_zone.zone)
-                record = r.data
+                record = self.loadRecord(record['domain'], _type, zone)
             data_for = getattr(self, '_data_for_{}'.format(_type))
             name = zone.hostname_from_fqdn(record['domain'])
             record = Record.new(zone, name, data_for(_type, record),
