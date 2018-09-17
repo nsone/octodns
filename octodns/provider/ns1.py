@@ -73,7 +73,8 @@ class Ns1Provider(BaseProvider):
         # If it's not a geo-enabled record, we'll only have the short version
         # returned by the /v1/zones/<zone> endpoint, which has no metadata.
         if not record.get('answers'):
-            data['values'] = [str(a) for a in record.get('short_answers', [])]
+            data['values'] = [unicode(a)
+                              for a in record.get('short_answers', [])]
             return data
 
         # For geo-enabled records we will have the full record object.
@@ -88,21 +89,21 @@ class Ns1Provider(BaseProvider):
             # only check for country if neither of those are specified.
             if us_states:
                 for state in us_states:
-                    key = str('NA-US-%s' % state)
-                    geo[key].extend([str(a) for a in answer['answer']])
+                    key = unicode('NA-US-%s' % state)
+                    geo[key].extend([unicode(a) for a in answer['answer']])
             elif ca_provinces:
                 for province in ca_provinces:
-                    key = str('NA-CA-%s' % province)
-                    geo[key].extend([str(a) for a in answer['answer']])
+                    key = unicode('NA-CA-%s' % province)
+                    geo[key].extend([unicode(a) for a in answer['answer']])
             elif countries:
                 for country in countries:
                     continent = cn_to_ctca2(cc_to_cn(country))
-                    key = '{}-{}'.format(continent, country)
-                    geo[key].extend([str(a) for a in answer['answer']])
+                    key = unicode('%s-%s' % (continent, country))
+                    geo[key].extend([unicode(a) for a in answer['answer']])
             else:
                 # No geo metadata means this is the regionless default answer
                 # that octo requires be present on all geo records.
-                data['values'].extend([str(a) for a in answer['answer']])
+                data['values'].extend([unicode(a) for a in answer['answer']])
 
         data['geo'] = OrderedDict(geo)
         return data
