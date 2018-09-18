@@ -64,7 +64,6 @@ class Ns1Provider(BaseProvider):
     def loadRecord(self, domain, _type, zone):
         domain = domain.rstrip('.')
         zone = zone.rstrip('.')
-        self.log.debug('loadRecord(%s, %s, %s)', domain, _type, zone)
         rec = (zone, domain, _type)
         if rec not in self._record_cache:
             self._record_cache[rec] = self._NS1Records.retrieve(*rec)
