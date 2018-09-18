@@ -143,7 +143,7 @@ class Ns1Provider(BaseProvider):
 
     def _data_for_CNAME(self, _type, record):
         try:
-            value = self._ensure_fqdn(['answers'][0])
+            value = self._fqdn(['answers'][0])
         except IndexError:
             value = None
         return {
@@ -161,7 +161,7 @@ class Ns1Provider(BaseProvider):
             preference, exchange = answer.split(' ', 1)
             values.append({
                 'preference': preference,
-                'exchange': self.ensure_fqdn(exchange),
+                'exchange': self.fqdn(exchange),
             })
         return {
             'ttl': record['ttl'],
@@ -192,7 +192,7 @@ class Ns1Provider(BaseProvider):
         return {
             'ttl': record['ttl'],
             'type': _type,
-            'values': [self._ensure_fqdn(a) for a in record['answers']],
+            'values': [self._fqdn(a) for a in record['answers']],
         }
 
     def _data_for_SRV(self, _type, record):
@@ -203,7 +203,7 @@ class Ns1Provider(BaseProvider):
                 'priority': priority,
                 'weight': weight,
                 'port': port,
-                'target': self._ensure_fqdn(target),
+                'target': self._fqdn(target),
             })
         return {
             'ttl': record['ttl'],
@@ -215,7 +215,7 @@ class Ns1Provider(BaseProvider):
         data_for_type = getattr(self, '_data_for_%s' % _type)
         return data_for_type(_type, record)
 
-    def _ensure_fqdn(self, name):
+    def _fqdn(self, name):
         return "%s." % name.rstrip('.')
 
     def populate(self, zone, target=False, lenient=False):
