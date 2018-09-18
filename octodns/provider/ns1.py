@@ -158,7 +158,7 @@ class Ns1Provider(BaseProvider):
             preference, exchange = answer.split(' ', 1)
             values.append({
                 'preference': preference,
-                'exchange': self.fqdn(exchange),
+                'exchange': self._fqdn(exchange),
             })
         return {
             'ttl': record['ttl'],
