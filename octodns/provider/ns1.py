@@ -55,10 +55,12 @@ class Ns1Provider(BaseProvider):
                 self._zone_cache[zone] = self._NS1Zones.create(zone)
             else:
                 try:
+                    self.log.debug('_loadZone: loading zone %s', zone)
                     self._zone_cache[zone] = self._NS1Zones.retrieve(zone)
                 except ResourceException as e:
                     if e.message != self.ZONE_NOT_FOUND_MESSAGE:
                         raise
+        self.log.debug('_loadZone: loading zone %s from cache', zone)
         return self._zone_cache.get(zone)
 
     def _loadRecord(self, domain, _type, zone):
@@ -66,7 +68,9 @@ class Ns1Provider(BaseProvider):
         zone = zone.rstrip('.')
         rec = (zone, domain, _type)
         if rec not in self._record_cache:
+            self.log.debug('_loadRecord: loading record %s/%s/%s)', rec)
             self._record_cache[rec] = self._NS1Records.retrieve(*rec)
+        self.log.debug('_loadRecord: loading record %s/%s/%s from cache', rec)
         return self._record_cache.get(rec)
 
     def _data_for_A(self, _type, record):
@@ -220,6 +224,7 @@ class Ns1Provider(BaseProvider):
 
         ns1_zone = self._loadZone(zone.name)
         if not ns1_zone:
+            self.log.info('populate:   found 0 records, exists=False')
             return False
 
         count = 0
@@ -307,6 +312,8 @@ class Ns1Provider(BaseProvider):
         zone = rec.zone.name.rstrip('.')
         domain = rec.fqdn.rstrip('.')
         params = self._params_for(rec)
+        self.log.debug('_apply_Create: creating record %s/%s/%s: %s',
+                       zone, domain, rec._type, params)
         self._NS1Records.create(zone, domain, rec._type, **params)
 
     def _apply_Update(self, change):
@@ -314,17 +321,21 @@ class Ns1Provider(BaseProvider):
         zone = rec.zone.name.rstrip('.')
         domain = rec.fqdn.rstrip('.')
         params = self._params_for(rec)
+        self.log.debug('_apply_Create: updating record %s/%s/%s: %s',
+                       zone, domain, rec._type, params)
         self._NS1Records.update(zone, domain, rec._type, **params)
 
     def _apply_Delete(self, change):
         rec = change.existing
         zone = rec.zone.name.rstrip('.')
         domain = rec.fqdn.rstrip('.')
+        self.log.debug('_apply_Delete: deleting record %s/%s/%s)',
+                       zone, domain, rec._type)
         self._NS1Records.delete(zone, domain, rec._type)
 
     def _apply(self, plan):
-        self.log.debug('_apply: zone=%s, len(changes)=%d', plan.desired.name,
-                       len(plan.changes))
+        self.log.debug('_apply: applying %d change(s) for zone %s',
+                       len(plan.changes), plan.desired.name)
         self._loadZone(plan.desired.name, create=True)
 
         for change in plan.changes:
