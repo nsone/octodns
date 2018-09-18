@@ -113,6 +113,7 @@ class Ns1Provider(BaseProvider):
     _data_for_AAAA = _data_for_A
 
     def _data_for_SPF(self, _type, record):
+        # NS1 doesn't escape semicolons in SPF rdata, so escape them here.
         values = [v.replace(';', '\\;') for v in record['answers']]
         return {
             'ttl': record['ttl'],
@@ -268,9 +269,7 @@ class Ns1Provider(BaseProvider):
     _params_for_NS = _params_for_A
 
     def _params_for_SPF(self, record):
-        # NS1 seems to be the only provider that doesn't want things
-        # escaped in values so we have to strip them here and add
-        # them when going the other way
+        # NS1 doesn't escape semicolons in SPF rdata, so unescape them here.
         values = [v.replace('\\;', ';') for v in record.values]
         return {'answers': values, 'ttl': record.ttl}
 
