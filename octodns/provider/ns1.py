@@ -139,7 +139,7 @@ class Ns1Provider(BaseProvider):
 
     def _data_for_CNAME(self, _type, record):
         try:
-            value = record['answers'][0]
+            value = self._ensure_fqdn(['answers'][0])
         except IndexError:
             value = None
         return {
@@ -157,7 +157,7 @@ class Ns1Provider(BaseProvider):
             preference, exchange = answer.split(' ', 1)
             values.append({
                 'preference': preference,
-                'exchange': exchange,
+                'exchange': self.ensure_fqdn(exchange),
             })
         return {
             'ttl': record['ttl'],
@@ -199,7 +199,7 @@ class Ns1Provider(BaseProvider):
                 'priority': priority,
                 'weight': weight,
                 'port': port,
-                'target': target,
+                'target': self._ensure_fqdn(target),
             })
         return {
             'ttl': record['ttl'],
@@ -231,9 +231,6 @@ class Ns1Provider(BaseProvider):
             record['answers'] = record['short_answers']
             if record['tier'] != 1:
                 record = self.loadRecord(record['domain'], _type, zone.name)
-            if _type in ['ALIAS', 'CNAME', 'MX', 'NS', 'PTR', 'SRV']:
-                for i, a in enumerate(record['answers']):
-                    record['answers'][i] = self._ensure_fqdn(a)
             name = zone.hostname_from_fqdn(record['domain'])
             record = Record.new(zone, name, self._data_for(_type, record),
                                 source=self, lenient=lenient)
