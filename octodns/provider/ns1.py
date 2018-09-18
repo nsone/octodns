@@ -44,11 +44,11 @@ class Ns1Provider(BaseProvider):
         self._zone_cache = {}
         self._record_cache = {}
 
-    def loadZone(self, zone, create=False):
+    def _loadZone(self, zone, create=False):
         zone = zone.rstrip('.')
         if zone not in self._zone_cache:
             if create:
-                self.log.debug('loadZone: creating zone %s', zone)
+                self.log.debug('_loadZone: creating zone %s', zone)
                 self._zone_cache[zone] = self._NS1Zones.create(zone)
             else:
                 try:
@@ -58,7 +58,7 @@ class Ns1Provider(BaseProvider):
                         raise
         return self._zone_cache.get(zone)
 
-    def loadRecord(self, domain, _type, zone):
+    def _loadRecord(self, domain, _type, zone):
         domain = domain.rstrip('.')
         zone = zone.rstrip('.')
         rec = (zone, domain, _type)
@@ -215,7 +215,7 @@ class Ns1Provider(BaseProvider):
         self.log.debug('populate: name=%s, target=%s, lenient=%s',
                        zone.name, target, lenient)
 
-        ns1_zone = self.loadZone(zone.name)
+        ns1_zone = self._loadZone(zone.name)
         if not ns1_zone:
             return False
 
@@ -227,7 +227,7 @@ class Ns1Provider(BaseProvider):
             count += 1
             record['answers'] = record['short_answers']
             if record['tier'] != 1:
-                record = self.loadRecord(record['domain'], _type, zone.name)
+                record = self._loadRecord(record['domain'], _type, zone.name)
             name = zone.hostname_from_fqdn(record['domain'])
             record = Record.new(zone, name, self._data_for(_type, record),
                                 source=self, lenient=lenient)
@@ -322,7 +322,7 @@ class Ns1Provider(BaseProvider):
     def _apply(self, plan):
         self.log.debug('_apply: zone=%s, len(changes)=%d', plan.desired.name,
                        len(plan.changes))
-        self.loadZone(plan.desired.name, create=True)
+        self._loadZone(plan.desired.name, create=True)
 
         for change in plan.changes:
             change_type = change.__class__.__name__
