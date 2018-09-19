@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, \
 
 from logging import getLogger
 from collections import OrderedDict, defaultdict
+from functools import wraps
 from ns1 import NS1
 from ns1.rest.errors import RateLimitException, ResourceException
 from incf.countryutils.transformations import cc_to_cn, cn_to_ctca2
@@ -14,6 +15,19 @@ from time import sleep
 
 from ..record import Record
 from .base import BaseProvider
+
+
+def ratelimited(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        while True:
+            try:
+                return method(self, *args, **kwargs)
+            except RateLimitException as e:
+                self.log.warn('%s: rate limit exceeded, throttling',
+                              method.__name__)
+                sleep(int(e.period) / 10)
+    return wrapper
 
 
 class Ns1Provider(BaseProvider):
@@ -44,6 +58,7 @@ class Ns1Provider(BaseProvider):
         self._zone_cache = {}
         self._record_cache = {}
 
+    @ratelimited
     def _loadZone(self, zone, create=False):
         zone = zone.rstrip('.')
         if zone not in self._zone_cache:
@@ -60,6 +75,7 @@ class Ns1Provider(BaseProvider):
         self.log.debug('_loadZone: loading zone %s from cache', zone)
         return self._zone_cache.get(zone)
 
+    @ratelimited
     def _loadRecord(self, domain, _type, zone):
         domain = domain.rstrip('.')
         zone = zone.rstrip('.')
@@ -304,6 +320,7 @@ class Ns1Provider(BaseProvider):
         params_for_type = getattr(self, '_params_for_%s' % record._type)
         return params_for_type(record)
 
+    @ratelimited
     def _apply_Create(self, change):
         rec = change.new
         zone = rec.zone.name.rstrip('.')
@@ -313,6 +330,7 @@ class Ns1Provider(BaseProvider):
                        zone, domain, rec._type, params)
         self._NS1Records.create(zone, domain, rec._type, **params)
 
+    @ratelimited
     def _apply_Update(self, change):
         rec = change.new
         zone = rec.zone.name.rstrip('.')
@@ -322,6 +340,7 @@ class Ns1Provider(BaseProvider):
                        zone, domain, rec._type, params)
         self._NS1Records.update(zone, domain, rec._type, **params)
 
+    @ratelimited
     def _apply_Delete(self, change):
         rec = change.existing
         zone = rec.zone.name.rstrip('.')
@@ -334,15 +353,6 @@ class Ns1Provider(BaseProvider):
         self.log.debug('_apply: applying %d change(s) for zone %s',
                        len(plan.changes), plan.desired.name)
         self._loadZone(plan.desired.name, create=True)
-
         for change in plan.changes:
-            change_type = change.__class__.__name__
-            make = getattr(self, '_apply_%s' % change_type)
-            while True:
-                try:
-                    make(change)
-                    break
-                except RateLimitException as e:
-                    self.log.warn('_apply_%s: rate limit exceeded, throttling',
-                                  change_type)
-                    sleep(int(e.period) / 10)
+            make = getattr(self, '_apply_%s' % change.__class__.__name__)
+            make(change)
