@@ -91,43 +91,27 @@ class Ns1Provider(BaseProvider):
         return self._record_cache.get(rec)
 
     def _data_for_A(self, _type, record):
-        data = {'ttl': record['ttl'], 'type': _type, 'values': []}
+        data = {'ttl': record['ttl'], 'type': _type, 'values': [],
+                'geo': defaultdict(list)}
 
         # If it's not a geo-enabled record, we'll only have the short version
         # returned by the /v1/zones/<zone> endpoint, which has no metadata.
         if record['tier'] == 1:
-            data['values'] = [unicode(a) for a in record.get('answers', [])]
+            data['values'] = record.get('answers', [])
             return data
 
         # For geo-enabled records we will have the full record object.
-        geo = defaultdict(list)
         for answer in record.get('answers', []):
-            meta = answer.get('meta', {})
-            countries = meta.get('country')
-            us_states = meta.get('us_state')
-            ca_provinces = meta.get('ca_province')
-
-            # Because us_state and ca_province metadata both imply a country,
-            # only check for country if neither of those are specified.
-            if us_states:
-                for state in us_states:
-                    key = unicode('NA-US-%s' % state)
-                    geo[key].extend([unicode(a) for a in answer['answer']])
-            elif ca_provinces:
-                for province in ca_provinces:
-                    key = unicode('NA-CA-%s' % province)
-                    geo[key].extend([unicode(a) for a in answer['answer']])
-            elif countries:
-                for country in countries:
-                    continent = cn_to_ctca2(cc_to_cn(country))
-                    key = unicode('%s-%s' % (continent, country))
-                    geo[key].extend([unicode(a) for a in answer['answer']])
+            note = answer.get('meta', {}).get('note')
+            answers = [unicode(a) for a in answer['answer']]
+            if note and note.startswith('octodns_region_code:'):
+                region = note.split(':')[1]
+                data['geo'][region].extend(answer['answer'])
             else:
                 # No geo metadata means this is the regionless default answer
                 # that octo requires be present on all geo records.
-                data['values'].extend([unicode(a) for a in answer['answer']])
+                data['values'].extend(answer['answer'])
 
-        data['geo'] = OrderedDict(geo)
         return data
 
     _data_for_AAAA = _data_for_A
@@ -269,19 +253,20 @@ class Ns1Provider(BaseProvider):
         geo = False
 
         for iso_region_code, target in getattr(record, 'geo', {}).items():
+            meta = {'note': 'octodns_region_code:%s' % iso_region_code}
             parts = iso_region_code.split('-')
             country = parts[1] if len(parts) > 1 else None
             state = parts[2] if len(parts) > 2 else None
             if country:
                 geo = True
                 if state and country == 'US':
-                    meta = {'us_state': state}
+                    meta['us_state'] = state
                 elif state and country == 'CA':
-                    meta = {'ca_province': state}
+                    meta['ca_province'] = state
                 else:
-                    meta = {'country': country}
-                for ans in target.values:
-                    params['answers'].append({'answer': [ans], 'meta': meta})
+                    meta['country'] = country
+            for ans in target.values:
+                params['answers'].append({'answer': [ans], 'meta': meta})
 
         params['filters'] = self.GEO_FILTER_CHAIN if geo else []
         return params
