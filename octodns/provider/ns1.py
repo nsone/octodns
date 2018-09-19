@@ -61,6 +61,10 @@ class Ns1Provider(BaseProvider):
         self._zone_cache = {}
         self._record_cache = {}
 
+    def _reset_cache(self):
+        self._zone_cache = {}
+        self._record_cache = {}
+
     @ratelimited
     def _loadZone(self, zone, create=False):
         zone = zone.rstrip('.')
