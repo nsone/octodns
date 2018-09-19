@@ -98,7 +98,7 @@ class Ns1Provider(BaseProvider):
 
         # If it's not a geo-enabled record, we'll only have the short version
         # returned by the /v1/zones/<zone> endpoint, which has no metadata.
-        if not record.get('filters'):
+        if record['tier'] == 1:
             data['values'] = [unicode(a) for a in record.get('answers', [])]
             return data
 
