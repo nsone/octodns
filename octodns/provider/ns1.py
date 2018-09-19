@@ -106,7 +106,6 @@ class Ns1Provider(BaseProvider):
         # For geo-enabled records we will have the full record object.
         for answer in record.get('answers', []):
             note = answer.get('meta', {}).get('note')
-            answers = [unicode(a) for a in answer['answer']]
             if note and note.startswith('octodns_region_code:'):
                 region = note.split(':')[1]
                 data['geo'][region].extend(answer['answer'])
