@@ -156,7 +156,7 @@ class Ns1Provider(BaseProvider):
 
     def _data_for_CNAME(self, _type, record):
         try:
-            value = self._fqdn(['answers'][0])
+            value = self._fqdn(record['answers'][0])
         except IndexError:
             value = None
         return {
