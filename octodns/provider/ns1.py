@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
+import threading
 from logging import getLogger
 from collections import OrderedDict, defaultdict
 from functools import wraps
@@ -21,12 +22,20 @@ def ratelimited(method):
     @wraps(method)
     def wrapper(self, *args, **kwargs):
         while True:
+            if self._ratelimited:
+                sleep(1)
+                continue
             try:
                 return method(self, *args, **kwargs)
             except RateLimitException as e:
-                self.log.warn('%s: rate limit exceeded, throttling',
-                              method.__name__)
-                sleep(int(e.period) / 10)
+                if self._ratelimited:
+                    continue
+                with self._lock:
+                    self._ratelimited = True
+                    self.log.warn('%s: rate limit exceeded, throttling',
+                                  method.__name__)
+                    sleep(int(e.period) / 10)
+                    self._ratelimited = False
     return wrapper
 
 
@@ -47,6 +56,18 @@ class Ns1Provider(BaseProvider):
         {"filter": "geotarget_country", "config": {}},
         {"filter": "select_first_n", "config": {"N": 1}}
     ]
+    _instance = None
+    _lock = threading.Lock()
+    _ratelimited = False
+
+    def __new__(cls, *args, **kwargs):
+        if Ns1Provider._instance is None:
+            with Ns1Provider._lock:
+                if Ns1Provider._instance is None:
+                    Ns1Provider._instance = (
+                        super(Ns1Provider, cls).__new__(cls, *args, **kwargs)
+                    )
+        return Ns1Provider._instance
 
     def __init__(self, id, api_key, *args, **kwargs):
         self.log = getLogger('Ns1Provider[%s]' % id)
