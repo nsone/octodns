@@ -82,6 +82,12 @@ class TestNs1Provider(TestCase):
             with self.assertRaises(AuthException):
                 provider.populate(Zone('unit.tests.', []))
 
+        # Zone not found, exception handled internally
+        with requests_mock() as mock:
+            mock.get(endpoint('/zones/unit.tests'), status_code=404,
+                     json={"message": "zone not found"})
+            provider.populate(Zone('unit.tests.', []))
+
         # Ratelimit error
         with requests_mock() as mock:
             # First return a 429 (rate limit error) and then a 200 to check that
