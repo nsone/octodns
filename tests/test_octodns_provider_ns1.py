@@ -7,17 +7,15 @@ from __future__ import absolute_import, division, print_function, \
 
 from copy import deepcopy
 import json
-from mock import MagicMock, Mock, call, patch
-from ns1.rest.records import Records as NS1Records
-from ns1.rest.zones import Zones as NS1Zones
+from mock import MagicMock
 from ns1.rest.errors import AuthException, RateLimitException, \
     ResourceException
 from os.path import dirname, join
 from requests_mock import ANY, mock as requests_mock
 from unittest import TestCase
 
-from octodns.record import Delete, Record, Update
-from octodns.provider.ns1 import Ns1Provider
+from octodns.record import Record
+from octodns.provider.ns1 import Ns1Provider, ratelimited
 from octodns.provider.yaml import YamlProvider
 from octodns.zone import Zone
 
