@@ -34,7 +34,7 @@ def ratelimited(method):
                     continue
                 with self._lock:
                     self._ratelimited = True
-                    self.log.warn('%s: rate limit exceeded, throttling',
+                    self.log.debug('%s: rate limit exceeded, throttling',
                                   method.__name__)
                     sleep(int(e.period) / 10)
                     self._ratelimited = False
