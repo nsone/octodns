@@ -7,11 +7,13 @@ from __future__ import absolute_import, division, print_function, \
 
 from copy import deepcopy
 import json
-from mock import MagicMock
-from ns1.rest.errors import AuthException, RateLimitException, \
-    ResourceException
+from mock import MagicMock, call, patch
+from ns1.rest.errors import (
+    AuthException, RateLimitException, ResourceException
+)
 from os.path import dirname, join
 from requests_mock import ANY, mock as requests_mock
+from threading import Lock
 from unittest import TestCase
 
 from octodns.record import Record
@@ -60,9 +62,10 @@ def endpoint(path):
 
 class TestNs1Provider(TestCase):
     def setUp(self):
-        with open(join(dirname(__file__), 'fixtures/ns1-zone.json')) as f:
+        base = dirname(__file__)
+        with open(join(base, 'fixtures/ns1-zone.json')) as f:
             self.ns1_zone = json.load(f)
-        with open(join(dirname(__file__), 'fixtures/ns1-geo-record.json')) as f:
+        with open(join(base, 'fixtures/ns1-geo-record.json')) as f:
             self.ns1_geo_record = json.load(f)
 
     def test_populate(self):
@@ -90,8 +93,8 @@ class TestNs1Provider(TestCase):
 
         # Ratelimit error
         with requests_mock() as mock:
-            # First return a 429 (rate limit error) and then a 200 to check that
-            # RateLimitExceptions are handled internally
+            # First return a 429 (rate limit error) and then a 200 to check
+            # that RateLimitExceptions are handled internally
             mock.get(ANY, [{'status_code': 429, 'json': {}},
                            {'status_code': 200, 'json': {}}])
             provider.populate(Zone('unit.tests.', []))
@@ -112,14 +115,13 @@ class TestNs1Provider(TestCase):
         with requests_mock() as mock:
             mock.get(endpoint('/zones/unit.tests'), json={
                 'zone': 'unit.tests',
-                'records': [
-                    {'domain': 'unsupported.unit.tests',
-                     'type': 'UNSUPPORTED',
-                     'ttl': 30,
-                     'short_answers': ['1.1.1.1'],
-                     'tier': 1,
-                    },
-                ],
+                'records': [{
+                    'domain': 'unsupported.unit.tests',
+                    'type': 'UNSUPPORTED',
+                    'ttl': 30,
+                    'short_answers': ['1.1.1.1'],
+                    'tier': 1,
+                }],
             })
             zone = Zone('unit.tests.', [])
             self.assertTrue(provider.populate(zone))
@@ -235,7 +237,7 @@ class TestNs1Provider(TestCase):
 
         # Test removing a record.
         zones_mock.retrieve.return_value = self.ns1_zone
-        records_mock.retrieve.return_value  = self.ns1_geo_record
+        records_mock.retrieve.return_value = self.ns1_geo_record
 
         remove_octodns_record(unit_test_zone, 'cname', 'CNAME')
         plan = provider.plan(unit_test_zone)
@@ -248,3 +250,40 @@ class TestNs1Provider(TestCase):
         self.assertEquals(0, records_mock.create.call_count)
         self.assertEquals(0, records_mock.update.call_count)
         self.assertEquals(1, records_mock.delete.call_count)
+
+    @patch('octodns.provider.ns1.sleep', return_value=None)
+    def test_ratelimited_decorator(self, mocked_sleep):
+        class RateLimitTest(object):
+            def __init__(self, rate_limit_responses):
+                self.rate_limit_responses = rate_limit_responses
+                self.my_method_call_count = 0
+
+                self._lock = Lock()
+                self.log = MagicMock()
+
+            @property
+            def _ratelimited(self):
+                return self.rate_limit_responses.pop(0)
+
+            @_ratelimited.setter
+            def _ratelimited(self, value):
+                pass
+
+            @ratelimited
+            def my_method(self):
+                self.my_method_call_count += 1
+                if self.my_method_call_count > 2:
+                    return
+                raise RateLimitException("429", None, None, period=20)
+
+        inst = RateLimitTest([True, False, True, False, False, False])
+        inst.my_method()
+
+        self.assertEqual(3, inst.my_method_call_count)
+
+        self.assertEqual(2, mocked_sleep.call_count)
+        self.assertEqual([call(1), call(2)], mocked_sleep.call_args_list)
+
+        inst.log.debug.assert_called_once_with(
+            '%s: rate limit exceeded, throttling', 'my_method'
+        )

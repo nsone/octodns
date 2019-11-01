@@ -5,16 +5,13 @@
 from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
-import threading
 from logging import getLogger
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from functools import wraps
 from ns1 import NS1
+from ns1.helpers import SingletonMixin
 from ns1.rest.errors import RateLimitException, ResourceException
-from incf.countryutils.transformations import cc_to_cn, cn_to_ctca2
 from time import sleep
-
-from six import text_type
 
 from ..record import Record
 from .base import BaseProvider
@@ -35,13 +32,13 @@ def ratelimited(method):
                 with self._lock:
                     self._ratelimited = True
                     self.log.debug('%s: rate limit exceeded, throttling',
-                                  method.__name__)
+                                   method.__name__)
                     sleep(int(e.period) / 10)
                     self._ratelimited = False
     return wrapper
 
 
-class Ns1Provider(BaseProvider):
+class Ns1Provider(BaseProvider, SingletonMixin):
     '''
     Ns1 provider
 
@@ -59,18 +56,7 @@ class Ns1Provider(BaseProvider):
         {"filter": "geotarget_country", "config": {}},
         {"filter": "select_first_n", "config": {"N": 1}}
     ]
-    _instance = None
-    _lock = threading.Lock()
     _ratelimited = False
-
-    def __new__(cls, *args, **kwargs):
-        if Ns1Provider._instance is None:
-            with Ns1Provider._lock:
-                if Ns1Provider._instance is None:
-                    Ns1Provider._instance = (
-                        super(Ns1Provider, cls).__new__(cls, *args, **kwargs)
-                    )
-        return Ns1Provider._instance
 
     def __init__(self, id, api_key, *args, **kwargs):
         self.log = getLogger('Ns1Provider[%s]' % id)
@@ -166,10 +152,7 @@ class Ns1Provider(BaseProvider):
         }
 
     def _data_for_CNAME(self, _type, record):
-        try:
-            value = self._fqdn(record['answers'][0])
-        except IndexError:
-            value = None
+        value = self._fqdn(record['answers'][0] if record['answers'] else None)
         return {
             'ttl': record['ttl'],
             'type': _type,
