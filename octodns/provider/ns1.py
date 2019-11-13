@@ -45,6 +45,13 @@ class Ns1Provider(BaseProvider, SingletonMixin):
     ns1:
         class: octodns.provider.ns1.Ns1Provider
         api_key: env/NS1_API_KEY
+
+    GEO support:
+        This provider supports country, US State, or CA Province only.
+        Region code must be provided but is currently unused.
+        Example for Country (Italy):     `EU-IT`
+        Example for US state (New York): `NA-US-NY`
+        Example for CA state (Nunavut):  `NA-CA-NU`
     '''
     SUPPORTS_GEO = True
     SUPPORTS_DYNAMIC = False

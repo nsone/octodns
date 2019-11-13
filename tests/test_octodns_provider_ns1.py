@@ -211,7 +211,7 @@ class TestNs1Provider(TestCase):
         rec['answers'].append({
             "answer": ["100.100.100.100"],
             "meta": {
-                "note": "octodns_region_code:NS-CA-BC",
+                "note": "octodns_region_code:NA-CA-BC",
                 "ca_province": ["BC"]
             }
         })
